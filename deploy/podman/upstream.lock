@@ -1,0 +1,17 @@
+# The upstream Supabase self-hosted release these units are converted from (PRD 5.2).
+# Bump = run bin/upstream-diff.sh <tag> (PQ-04), review, change this file, re-run the
+# parity walk on dev, then staging, then prod. Digests are added when the images are
+# first pulled on dev (PQ-04 acceptance), so a tag can never silently move under us.
+release=self-hosted/v0.8.4
+#  unit                 upstream service  image
+db=supabase/postgres:17.6.1.136
+auth=supabase/gotrue:v2.197.0
+rest=postgrest/postgrest:v14.18
+realtime=supabase/realtime:v2.148.3
+storage=supabase/storage-api:v1.89.12
+meta=supabase/postgres-meta:v0.100.0
+studio=supabase/studio:2026.11.02-sha-a05e7ec
+gateway=envoyproxy/envoy:v1.39.6
+# Not converted at this release: imgproxy (0 storage transforms), functions (0 invokes),
+# supavisor (no direct Postgres client in src/), and the optional logs overlay
+# (docker-compose.logs.yml: analytics/Logflare + vector, which mounts the Docker socket).

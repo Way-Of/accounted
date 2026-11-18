@@ -1,0 +1,20 @@
+# Values from upstream Supabase's docker/.env.example and Accounted's docker/.env.example.
+# A secret equal to any line here is refused: a demo key in a running instance is a published key.
+# Refreshed from upstream self-hosted/v0.8.4 (2026-11-17).
+your-super-secret-jwt-token-with-at-least-32-characters-long
+your-super-secret-and-long-postgres-password
+this_password_is_insecure_and_should_be_updated
+generate-a-random-secret
+your-anon-key
+your-service-role-key
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJzZXJ2aWNlX3JvbGUiLAogICAgImlzcyI6ICJzdXBhYmFzZS1kZW1vIiwKICAgICJpYXQiOiAxNjQxNzY5MjAwLAogICAgImV4cCI6IDE3OTk1MzU2MDAKfQ.DaYlNEoUrrEn2Ig7tqibS-PHK5vgusbcbo7X36XVt4Q
+UpNVntn3cDxHJpq99YMc1T1AQgQpc8kfYTuRgBiYa15BLrx8etQoXz3gZv1/u2oq
+supabaserealtime
+your-32-character-encryption-key
+your-encryption-key-32-chars-min
+your-super-secret-and-long-logflare-key-public
+your-super-secret-and-long-logflare-key-private
+625729a08b95bf1b7ff351a663f3a23c
+850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907
+secret1234

@@ -1,0 +1,9 @@
+# The instance's private network. Internal: no route out of the host.
+# Only the edge publishes a port; app and auth leave through the egress proxy (PRD 6).
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: internal network
+
+[Network]
+NetworkName=accounted
+Internal=true
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
