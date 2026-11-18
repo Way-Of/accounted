@@ -35,3 +35,18 @@ The files below are the shared source of truth for path-specific guidance. Claud
 - `.claude/rules/mcp-server.md`: MCP tool authoring, staged-operation pattern, OAuth 2.1 connector auth
 - `.claude/rules/bookkeeping.md`: BAS accounts, VAT treatments/rutor, `src/lib/core/` services
 - `.claude/rules/legal-forms.md`: capability profiles, never `=== 'aktiebolag'` at call sites; contract in `docs/LEGAL-FORMS.md` (`src/lib/company/**`, templates, year-end, import)
+
+## This is a public fork — what may never be committed here
+
+This repository is **public**, and it is a fork of an AGPL‑3.0 project. Every push is published the moment it lands,
+and a secret that reaches a public commit has to be rotated, not deleted. Two consequences for anyone working here:
+
+**Never commit:** a key, a token, a password, a connection string carrying credentials, a `.env`/`.env.local`, a real
+customer's or company's data, an internal hostname or IP address, a private runbook, or a screenshot of one.
+
+**Always keep:** `LICENSE` and `NOTICE` byte-identical to upstream, and changes inside the documented Extension API
+where a change is not meant for everyone.
+
+A configuration for one particular installation belongs with that installation, not in this repository. When in
+doubt, leave it out and say so in the pull request — an omission is recoverable, a published secret is not.
+
