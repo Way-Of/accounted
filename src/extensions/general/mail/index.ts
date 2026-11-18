@@ -23,7 +23,7 @@ import {
   listConnections,
   saveConnection,
 } from './lib/connections'
-import { resolveCallbackOrigin } from './lib/callback-origin'
+import { resolveCallbackOrigin } from '@/lib/auth/callback-origin'
 import { isMailConnectEnabled } from './lib/connect-gate'
 import { requireFlowInitiator } from '@/lib/auth/oauth-flow-binding'
 import { createClient } from '@/lib/supabase/server'
