@@ -25,6 +25,12 @@ COPY . .
 # runs setup:extensions which reads extensions.config.json)
 COPY docker/extensions.${EXTENSIONS_PRESET}.json ./extensions.config.json
 
+# A new id per build stamps every static asset URL (?dpl=<id>). The NEXT_PUBLIC_* sentinels below are
+# replaced at runtime, so the chunk FILE NAMES are the same for every install and every key: without this a
+# CDN in front keeps serving a chunk that carries an old anon key, and every sign-in answers 401.
+ARG DEPLOYMENT_ID=
+ENV NEXT_DEPLOYMENT_ID=${DEPLOYMENT_ID}
+
 # Build with placeholder sentinel values for NEXT_PUBLIC_* vars.
 # These get replaced at runtime by docker-entrypoint.sh so the image
 # is generic and reusable across different Supabase projects.
