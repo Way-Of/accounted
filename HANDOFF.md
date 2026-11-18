@@ -51,6 +51,14 @@ phase_status:
 1. Craig answers the open questions (PRD section 12); Q10 matters before PQ-04 writes units.
 2. PQ-01 (config contract + register rows), PQ-02 (users, installer), PQ-03 (secrets), then PQ-04 (the stack).
 
+## Remotes
+
+| Remote | URL | State 2026-11-17 |
+|---|---|---|
+| `origin` | `git@github.com:Way-Of/accounted.git` | pushed |
+| `forgejo` | `http://localhost:8889/Way-Of/accounted.git` (Minisforum, rootless under craigema) | **not pushed**: needs the `wayof` password; push-to-create is off, so the repo must exist first |
+| `forgejo-hostinger` | `https://git.veyral.io/Way-Of/accounted.git` (Hostinger, user `forgejo`, SSH disabled) | **not pushed**: needs a sign-in or token; repo existence unknown |
+
 ## Not live
 
 Nothing is live. No instance user exists, no unit is installed, no secret created, no port claimed in
