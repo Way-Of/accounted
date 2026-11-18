@@ -7,7 +7,7 @@ import {
   verifyOAuthState,
 } from './lib/crypto'
 import { performSync } from './lib/sync'
-import { resolveCallbackOrigin } from './lib/callback-origin'
+import { resolveCallbackOrigin } from '@/lib/auth/callback-origin'
 import { stockholmHourToUtcHour } from './lib/schedule'
 import { CLOUD_PROVIDERS, providerFromRequest } from './lib/provider-registry'
 import { googleDriveProvider } from './lib/google-provider'

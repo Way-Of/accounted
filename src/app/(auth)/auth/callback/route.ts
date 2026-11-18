@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { hashInviteToken } from '@/lib/auth/invite-tokens'
 import { INVITE_COOKIE_NAME } from '@/lib/auth/consume-invite-cookie'
 import { safeReturnTo } from '@/lib/auth/safe-return-to'
+import { resolveCallbackOrigin } from '@/lib/auth/callback-origin'
 import { resolveLandingDestination } from '@/lib/company/landing-server'
 import { acceptPendingTeamInviteByToken } from '@/lib/company/pending-invites'
 
@@ -169,7 +170,10 @@ async function resolveStockEmailChangeStatus(
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams, origin: requestOrigin } = new URL(request.url)
+  // Behind a proxy, Next's standalone server reports its bound address (0.0.0.0:3000) as the request's
+  // origin, so every redirect below would leave the site. The canonical NEXT_PUBLIC_APP_URL wins when set.
+  const origin = resolveCallbackOrigin(requestOrigin)
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type')
