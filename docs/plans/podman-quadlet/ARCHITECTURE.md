@@ -105,6 +105,9 @@ flowchart LR
       subgraph ujosef["user josef (exists)"]
         atlas["AtlasAI pod<br/>atlas-dev.veyral.io"]
       end
+      subgraph uinf["user infisical (planned, PQ-15)"]
+        inf["Infisical + its Postgres + Redis<br/>127.0.0.1:24095 · tailnet only<br/>project accounted: dev · staging · prod"]
+      end
     end
 
     gh["GitHub<br/>Way-Of/accounted"]
@@ -118,9 +121,12 @@ flowchart LR
     ts1 -.->|"road: tailnet (opt-in)"| devinst
     gh <-->|"push"| fj1
     gh <-->|"push"| fj2
+    inf -.->|"pulled at install/upgrade<br/>machine identity per instance"| stginst
+    inf -.-> prodinst
+    ts1 -.->|"tailnet: dev secrets"| inf
 
     classDef planned stroke-dasharray: 5 5
-    class devinst,stginst,prodinst planned
+    class devinst,stginst,prodinst,inf planned
 ```
 
 | Instance | Host | Linux user | Port block | Road |

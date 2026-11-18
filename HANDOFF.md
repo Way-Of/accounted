@@ -14,11 +14,11 @@ handoff{ "branch": "podman-conversion-and-staging-push", "base": "b0b481b9d", "u
 ```
 phase_status:
   "PRD","revision 2: docs/plans/podman-quadlet/PRD.md (official Supabase self-hosted stack, trimmed, PG 17)"
-  "Tasks","14 slices: docs/plans/podman-quadlet/tasks/ (PQ-01..PQ-14)"
+  "Tasks","15 slices: docs/plans/podman-quadlet/tasks/ (PQ-01..PQ-15)"
   "Diagrams","docs/plans/podman-quadlet/ARCHITECTURE.md (estate, hosts, instance, boot, request, delivery)"
-  "Remotes","branch pushed to GitHub, Forgejo Minisforum, Forgejo Hostinger (see Remotes below)"
-  "Answered","Q2 images approved · Q3 Postgres 17 · Q5 Minisforum = same approach as Hostinger"
-  "Open","Q1 upstream, Q4 Cloudflare Access, Q6 shared VPS, Q8 secret source, Q9 first books/EU region, Q10 internal ports"
+  "Remotes","pushed to GitHub only; both Forgejos wait on credentials (see Remotes below)"
+  "Answered","all Q1-Q10 (PRD section 12): fork only · Access on staging/prod · shared VPS for now · Infisical · Reygan's books first on prod (EU VPS) · internal ports keep image defaults"
+  "Tasks added","PQ-15 Infisical on Hostinger (user infisical, block 24095-24098, tailnet only)"
   "Code","none yet; nothing installed, no units on any host, no ports bound"
 ```
 
@@ -48,8 +48,9 @@ phase_status:
 
 ## Next actions
 
-1. Craig answers the open questions (PRD section 12); Q10 matters before PQ-04 writes units.
-2. PQ-01 (config contract + register rows), PQ-02 (users, installer), PQ-03 (secrets), then PQ-04 (the stack).
+1. Get a personuppgiftsbiträdesavtal (DPA) with Reygan started; it gates `prod` go-live (PQ-11).
+2. Finish the Forgejo pushes (needs Craig's credentials; see Remotes).
+3. PQ-01 (config contract + register rows), PQ-02 (users, installer), PQ-03 (secrets), then PQ-04 (the stack).
 
 ## Remotes
 

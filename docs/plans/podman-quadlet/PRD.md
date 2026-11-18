@@ -1,6 +1,6 @@
 # PRD: Accounted on Podman Quadlet with self-hosted Supabase
 
-**Status:** revision 2, Q2/Q3/Q5 answered · **Date:** 2026-11-17 · **Owner:** Craig · **Branch:** `docs/podman-quadlet-prd`
+**Status:** revision 2, all open questions answered (2026-11-17) · **Date:** 2026-11-17 · **Owner:** Craig · **Branch:** `docs/podman-quadlet-prd`
 **Tasks:** [`tasks/`](tasks/README.md) · **Diagrams:** [`ARCHITECTURE.md`](ARCHITECTURE.md) · **Resume point:** [`/HANDOFF.md`](../../../HANDOFF.md)
 
 > **Revision 2 (2026-11-17).** Revision 1 proposed a stock `postgres` image with hand-picked Supabase
@@ -203,12 +203,13 @@ Each port is one env var (`ACCOUNTED_EDGE_PORT`, `ACCOUNTED_STUDIO_PORT`, `ACCOU
 one documented default per instance in `deploy/podman/instances/<instance>.env`; the published port,
 the proxy target and the health probe read it.
 
-**Ports inside the internal network (Q10).** Container ports that are never published (GoTrue 9999,
-PostgREST 3000, storage 5000, gateway 8000, the app 3000, ...) keep their image defaults. Each container
-has its own network namespace, so they cannot collide with anything on the host, and renumbering them
-would fork upstream's gateway config and every service's env on each release. The values live in one
-file (`deploy/podman/internal-ports.env`) that the units read. If Craig wants the rule applied inside the
-netns too, the reserved offsets `+3..+7` absorb the app and gateway and the rest get env overrides.
+**Ports inside the internal network (Q10, decided 2026-11-17).** Container ports that are never
+published (GoTrue 9999, PostgREST 3000, storage 5000, gateway 8000, the app 3000, ...) keep their image
+defaults. Each container has its own network namespace, so they cannot collide with anything on the
+host, and renumbering them would fork upstream's gateway config and every service's env on each
+release; an intruder already inside the internal network gains nothing from different numbers. The
+values live in one file (`deploy/podman/internal-ports.env`) that the units read. Every host-published
+port still comes from a five-digit block.
 
 Every block is claimed in the private services register (`$YMIR_HOME/config/services.yaml`, read by
 `bin/ward/services-register.sh`) on each host before first bind. The register does not exist on the
@@ -222,7 +223,27 @@ Minisforum yet; PQ-01 creates the rows.
 - Person-supplied values (SMTP, Google OAuth, AI endpoint key) are read once from a 0600 file outside the
   repo. The script refuses a path ending in `.env.local` (CLAUDE.md: that file is production).
 - Nothing secret is written into a unit file, an image layer, the repo or the journal.
-- Later source: the Atlas vault once its API is live, else Infisical (Q8).
+- **Source of record: Infisical (Q8, section 7.5).** `secrets-init.sh` generates on first install and
+  writes the values to Infisical; afterwards it pulls from Infisical into Podman secrets at install and
+  upgrade time. Containers never call Infisical at start, so an Infisical outage cannot stop Accounted.
+
+### 7.5 Infisical (the secrets manager)
+
+A separate Quadlet stack, not part of any Accounted instance, because other Way-Of products will use it
+too. The house already runs it (`wayofteams-infisical`, WoWx's `secrets-init` pulls from it); this is
+the hardened, shared instance.
+
+| | |
+|---|---|
+| Where | Hostinger, Linux user `infisical` (shape A, for now), one instance serving all environments |
+| Units | `infisical` (image pinned, starting from the house's `v0.159.25`), `infisical-db` (Postgres), `infisical-redis`; network `infisical.network` (`Internal=true` except the app's SMTP egress) |
+| Port block | **24095-24098**: `+0` web/API on `127.0.0.1` only; `+1..+3` reserved. Measured free on both hosts 2026-11-17 |
+| Road | `tailnet` for people and for the Minisforum; Accounted users on the same VPS reach it over host loopback. Never on the Cloudflare tunnel |
+| Layout | one project `accounted`, environments `dev`, `staging`, `prod`; one machine identity per instance user, read-only, scoped to its environment |
+| Secret zero | each instance user's machine-identity credential is the one local secret: a Podman secret, 0600 at rest |
+| Root keys | Infisical's `ENCRYPTION_KEY` and `AUTH_SECRET` are written once to an offline, printed or hardware-held copy; losing them loses every secret |
+| Backups | its database in the same backup timer pattern as PQ-10, encrypted, off-host |
+| Naming | it is **Infisical**, never "the vault": "Vault" is the Atlas document product |
 
 ### 7.3 No literal paths
 
@@ -289,19 +310,21 @@ Agents never get a database credential, never reach Studio, and never hold a mod
 | Upstream demo keys or open defaults leak into a running instance | `secrets-init.sh` replaces every demo key; install refuses to start if a known demo value is present |
 | Rootless images expect root-owned paths | per-unit `UserNS`/capabilities found in PQ-04, recorded in the unit, never `SecurityLabelDisable` |
 | Memory on the Hostinger VPS with two stacks | trimmed set; measured in PQ-10; staging can be stopped when idle |
-| Hostinger is process isolation, not network isolation | stated limit; box-per-zone (shape B) for clients |
+| Hostinger is process isolation, not network isolation, and Reygan's books (client data) go on `prod` there (Q6 "for now", Q9) | named limit in the client agreement; trigger to move `prod` to its own box (shape B): a second client, or any finding from the ward on that VPS |
+| Infisical becomes the crown jewel and a dependency | pulled at install time only (containers never depend on it at start); root keys held offline; restore drill in PQ-15 |
+| Cloudflare Access blocks non-browser clients (external MCP connectors, webhooks) on the tunnel | Access service tokens or a narrow bypass for `/api/mcp` and webhook paths, each listed in PQ-11; peers on the box use loopback and never meet Access |
 
 ## 12. Decisions and open questions
 
 | # | Question | Answer / recommendation |
 |---|---|---|
-| Q1 | Upstream `deploy/podman/` to `erp-mafia/accounted` or keep it in the fork | open; recommend fork until PQ-08 passes |
+| Q1 | Upstream `deploy/podman/` to `erp-mafia/accounted` | **no**: stays in the `Way-Of/accounted` fork; everything lives in new paths so upstream syncs stay clean |
 | Q2 | Image surface and licences | **approved 2026-11-17** |
 | Q3 | Postgres major | **17** (matches upstream's self-hosted default, no future upgrade owed); pg-real on 17 added |
-| Q4 | Cloudflare Access in front of the tunnel road | open; recommend yes on Hostinger, tailnet-only locally |
+| Q4 | Cloudflare Access in front of the tunnel road | **yes** for `staging` and `prod`; `dev` stays tailnet-only |
 | Q5 | Minisforum approach | **same as Hostinger**: self-hosted stack, dedicated instance user, same installer |
-| Q6 | Hostinger: same VPS as AtlasAI, separate users per instance | open; recommend yes for our own books, shape B for clients |
+| Q6 | Hostinger: same VPS as AtlasAI, separate users per instance | **yes, for now**; shape B trigger in section 11 |
 | Q7 | Shared inter-product network | superseded: rootless networks are per user, so peers use the loopback door with scoped keys |
-| Q8 | Secret source after the local generator | open; recommend the Atlas vault once live |
-| Q9 | Whose books go on Hostinger `prod` first; VPS region in the EU | open; Way-Of's own test company until confirmed |
-| Q10 | Apply the five-digit rule to internal, never-published container ports too | open; recommend no (section 7.1), switchable via reserved offsets |
+| Q8 | Secret source after the local generator | **Infisical**, its own Quadlet stack (section 7.5, PQ-15) |
+| Q9 | Whose books go on `prod` first; VPS region | **Reygan's books first; the VPS is in the EU.** Client data: a personuppgiftsbiträdesavtal (DPA) with Reygan before go-live, and the BFL 7 kap archive (PQ-10) running before the first real verifikat |
+| Q10 | Five-digit rule for internal, never-published container ports | **no**: image defaults inside the netns; published ports only from blocks (section 7.1) |

@@ -12,6 +12,8 @@
 - Units consume with `Secret=<name>,type=env,target=<VAR>`.
 - `install.sh start` refuses if any secret equals a value from upstream's `.env.example` (demo keys).
 
+- Built so the source can switch to Infisical (`--source local|infisical`, PQ-15) without changing units.
+
 ## Acceptance
 - `podman secret ls` shows the set; `podman inspect` of any unit shows no secret in `Env`.
 - `git grep -nE 'eyJ|sk_live|BEGIN (RSA|OPENSSH)' deploy/` finds nothing.
