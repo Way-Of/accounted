@@ -1,5 +1,9 @@
 # PQ-15: Infisical as the secrets manager
 
+> **Parked 2026-11-17 (Q8 reopened by Craig).** Concern: weight on every client deployment target
+> (multi-cloud, several VPSs, local servers) and the debt is not worth the security gain at our
+> size. Kept for the record; not to be built unless Q8 lands back here.
+
 **Depends on:** PQ-03 · **Blocks:** PQ-11 (no client secret on `prod` lives only in a local generator) · **Size:** M
 
 ## Goal

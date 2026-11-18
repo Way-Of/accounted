@@ -14,12 +14,11 @@ handoff{ "branch": "podman-conversion-and-staging-push", "base": "b0b481b9d", "u
 ```
 phase_status:
   "PRD","revision 2: docs/plans/podman-quadlet/PRD.md (official Supabase self-hosted stack, trimmed, PG 17)"
-  "Tasks","15 slices: docs/plans/podman-quadlet/tasks/ (PQ-01..PQ-15)"
-  "Diagrams","docs/plans/podman-quadlet/ARCHITECTURE.md (estate, hosts, instance, boot, request, delivery)"
-  "Remotes","pushed to GitHub only; both Forgejos wait on credentials (see Remotes below)"
-  "Answered","all Q1-Q10 (PRD section 12): fork only · Access on staging/prod · shared VPS for now · Infisical · Reygan's books first on prod (EU VPS) · internal ports keep image defaults"
-  "Tasks added","PQ-15 Infisical on Hostinger (user infisical, block 24095-24098, tailnet only)"
-  "Code","none yet; nothing installed, no units on any host, no ports bound"
+  "Tasks","15 slices: docs/plans/podman-quadlet/tasks/ (PQ-01..PQ-15); statuses in tasks/README.md"
+  "Diagrams","docs/plans/podman-quadlet/ARCHITECTURE.md"
+  "Built","PQ-01 done; PQ-02 + PQ-03 code done (deploy/podman/bin/*, 23 tests in scripts/__tests__/podman-deploy.test.ts); PQ-04 started: upstream pinned at self-hosted/v0.8.4"
+  "Blocked on Craig","create the accounted-dev user (prepare-host.sh prints the root steps); decide Q8 (Infisical parked)"
+  "Remotes","GitHub only; both Forgejos wait on credentials (see Remotes below)"
 ```
 
 ## Facts established (do not re-derive)
@@ -33,6 +32,11 @@ phase_status:
   `supabase_migrations.schema_migrations`). No custom runner.
 - **Instances, one Linux user each:** `dev` (Minisforum, `accounted-dev`), `staging` and `prod`
   (Hostinger, `accounted-staging`, `accounted-prod`). Same `install.sh` everywhere.
+- **Built so far:** `deploy/podman/` (instances/*.env, internal-ports.env, secrets.manifest, demo-values.txt,
+  upstream.lock, quadlets/accounted.network, bin/{lib,check,prepare-host,install,secrets-init}.sh). Services
+  register rows in `$YMIR_HOME/config/services.yaml` (created 2026-11-17, check is clean).
+- **Upstream v0.8.4 facts:** Envoy is the default gateway; analytics/vector moved to an optional logs overlay;
+  new opaque/asymmetric keys are optional (we keep HS256 anon/service_role, which the app reads).
 - **Port blocks:** prod 17166-17173, staging 26219-26226, dev 21230-21237. `+0` edge (only published
   port, 127.0.0.1), `+1` Studio and `+2` DB admin (loopback, on demand), `+3..+7` reserved.
   Internal container ports keep image defaults pending Q10.
@@ -48,9 +52,12 @@ phase_status:
 
 ## Next actions
 
-1. Get a personuppgiftsbiträdesavtal (DPA) with Reygan started; it gates `prod` go-live (PQ-11).
-2. Finish the Forgejo pushes (needs Craig's credentials; see Remotes).
-3. PQ-01 (config contract + register rows), PQ-02 (users, installer), PQ-03 (secrets), then PQ-04 (the stack).
+1. Craig: `deploy/podman/bin/prepare-host.sh --instance dev`, run the printed root steps (user, subids, linger).
+2. Craig: decide Q8 (secrets source of record; Infisical parked). Recommendation in the session notes: SOPS + age.
+3. As `accounted-dev`: `secrets-init.sh --instance dev`, `install.sh --instance dev install`, then finish PQ-04
+   (units for db, auth, rest, storage, realtime, gateway (Envoy), meta, studio from the v0.8.4 compose in
+   upstream `docker/`; vendored init SQL minus `_supabase.sql`, `logs.sql`, `pooler.sql`).
+4. Start the DPA with Reygan (gates `prod`, PQ-11). Finish the Forgejo pushes.
 
 ## Remotes
 

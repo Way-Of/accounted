@@ -223,11 +223,13 @@ Minisforum yet; PQ-01 creates the rows.
 - Person-supplied values (SMTP, Google OAuth, AI endpoint key) are read once from a 0600 file outside the
   repo. The script refuses a path ending in `.env.local` (CLAUDE.md: that file is production).
 - Nothing secret is written into a unit file, an image layer, the repo or the journal.
-- **Source of record: Infisical (Q8, section 7.5).** `secrets-init.sh` generates on first install and
-  writes the values to Infisical; afterwards it pulls from Infisical into Podman secrets at install and
-  upgrade time. Containers never call Infisical at start, so an Infisical outage cannot stop Accounted.
+- **Source of record: open (Q8 reopened).** Today `secrets-init.sh` generates into each instance user's
+  Podman store, from `deploy/podman/secrets.manifest`. Whatever Q8 lands on must keep two properties:
+  no server on every deployment target, and containers never fetch secrets at start.
 
-### 7.5 Infisical (the secrets manager)
+### 7.5 Infisical (parked, Q8 reopened)
+
+Kept for the record; not built unless Q8 lands here.
 
 A separate Quadlet stack, not part of any Accounted instance, because other Way-Of products will use it
 too. The house already runs it (`wayofteams-infisical`, WoWx's `secrets-init` pulls from it); this is
@@ -325,6 +327,6 @@ Agents never get a database credential, never reach Studio, and never hold a mod
 | Q5 | Minisforum approach | **same as Hostinger**: self-hosted stack, dedicated instance user, same installer |
 | Q6 | Hostinger: same VPS as AtlasAI, separate users per instance | **yes, for now**; shape B trigger in section 11 |
 | Q7 | Shared inter-product network | superseded: rootless networks are per user, so peers use the loopback door with scoped keys |
-| Q8 | Secret source after the local generator | **Infisical**, its own Quadlet stack (section 7.5, PQ-15) |
+| Q8 | Secret source after the local generator | **reopened 2026-11-17**: Infisical parked (weight on every client deployment target; debt not worth it at our size). Today: Podman secrets from `secrets-init.sh`, per instance user. Options under review in HANDOFF |
 | Q9 | Whose books go on `prod` first; VPS region | **Reygan's books first; the VPS is in the EU.** Client data: a personuppgiftsbiträdesavtal (DPA) with Reygan before go-live, and the BFL 7 kap archive (PQ-10) running before the first real verifikat |
 | Q10 | Five-digit rule for internal, never-published container ports | **no**: image defaults inside the netns; published ports only from blocks (section 7.1) |

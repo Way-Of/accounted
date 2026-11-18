@@ -1,6 +1,6 @@
 # PQ-11: Hostinger `staging` then `prod`
 
-**Depends on:** PQ-10, PQ-15, a signed DPA with Reygan · **Size:** M
+**Depends on:** PQ-10, the Q8 secrets decision, a signed DPA with Reygan · **Size:** M
 
 ## Scope
 - `prepare-host.sh --instance staging` and `--instance prod` printed for Craig; users created, linger on.
@@ -12,7 +12,7 @@
 - Cloudflare Access in front of both public names (Q4). List every non-browser caller that comes in
   over the tunnel (external MCP connectors, webhooks, email-hook callbacks) and give each a service
   token or a narrow path bypass, written in the runbook.
-- Secrets from Infisical (`secrets-init.sh --source infisical`), not the local generator.
+- Secrets per the Q8 decision (PRD 7.2).
 - `prod` go-live for Reygan's books only after: DPA signed, PQ-10 backups running to EU storage with
   Object Lock, restore drill passed on `staging`.
 - Measure memory with both stacks up; record it.
