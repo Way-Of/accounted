@@ -1,0 +1,45 @@
+# The Accounted app (Next.js), the image built from this release's commit. Same hardening as the
+# repo's docker-compose.yml: read-only root, no capabilities, bundle on a volume, public on tmpfs.
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: app
+Wants=accounted-gateway.service
+After=accounted-gateway.service
+
+[Container]
+ContainerName=accounted-app
+Image=${ACCOUNTED_IMAGE}
+Pod=accounted.pod
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=accounted-next.volume:/app/.next
+Tmpfs=/tmp
+# U: owned by the container user (nextjs, 1001), the Podman form of compose's uid=1001,gid=1001
+Tmpfs=/app/public:rw,size=200m,mode=0750,U
+Secret=accounted-anon-key,type=env,target=NEXT_PUBLIC_SUPABASE_ANON_KEY
+Secret=accounted-service-role-key,type=env,target=SUPABASE_SERVICE_ROLE_KEY
+Secret=accounted-cron-secret,type=env,target=CRON_SECRET
+Environment=NEXT_PUBLIC_SUPABASE_URL=${ACCOUNTED_PUBLIC_URL}
+Environment=NEXT_PUBLIC_APP_URL=${ACCOUNTED_PUBLIC_URL}
+Environment=NEXT_PUBLIC_SELF_HOSTED=true
+Environment="NEXT_PUBLIC_BRANDING_APP_NAME=${ACCOUNTED_BRAND_NAME}"
+Environment=AUTH_SIGNUPS_DISABLED=true
+Environment=PORT=${ACCOUNTED_INTERNAL_APP_PORT}
+Environment=NODE_OPTIONS=--max-old-space-size=1536
+# Podman appends HOSTNAME=<pod name> after our Environment=, so Next would listen on the pod's
+# address only and the edge's 127.0.0.1 would be refused: set it in the command the entrypoint execs.
+Exec=env HOSTNAME=0.0.0.0 node server.js
+HealthCmd=wget -q --spider http://127.0.0.1:${ACCOUNTED_INTERNAL_APP_PORT}/api/health
+HealthInterval=30s
+HealthRetries=3
+HealthStartPeriod=60s
+RunInit=true
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+PodmanArgs=--memory=2g --pids-limit=200
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

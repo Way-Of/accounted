@@ -1,0 +1,4 @@
+# pgsodium key and custom config (/etc/postgresql-custom)
+[Volume]
+VolumeName=accounted-db-config
+Label=accounted.instance=${ACCOUNTED_INSTANCE}

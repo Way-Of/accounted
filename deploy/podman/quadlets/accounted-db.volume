@@ -1,0 +1,4 @@
+# the database cluster (PGDATA)
+[Volume]
+VolumeName=accounted-db
+Label=accounted.instance=${ACCOUNTED_INSTANCE}

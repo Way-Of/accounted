@@ -1,0 +1,28 @@
+# The edge (PRD 6): one door, single origin. Supabase paths to the gateway, the rest to the app.
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: edge (Caddy)
+
+[Container]
+ContainerName=accounted-edge
+Image=${ACCOUNTED_IMG_EDGE}
+Pod=accounted.pod
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=%h/.local/share/accounted/release/edge/Caddyfile:/etc/caddy/Caddyfile:ro
+Environment=ACCOUNTED_EDGE_PORT=${ACCOUNTED_EDGE_PORT}
+Environment=ACCOUNTED_INTERNAL_APP_PORT=${ACCOUNTED_INTERNAL_APP_PORT}
+Environment=XDG_DATA_HOME=/tmp
+Environment=XDG_CONFIG_HOME=/tmp
+Tmpfs=/tmp
+NoNewPrivileges=true
+DropCapability=ALL
+# the image's caddy binary carries file capability cap_net_bind_service; without it in the bounding
+# set the exec fails under no-new-privileges ("exec /usr/bin/caddy: operation not permitted")
+AddCapability=NET_BIND_SERVICE
+ReadOnly=true
+PodmanArgs=--memory=128m --pids-limit=100
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

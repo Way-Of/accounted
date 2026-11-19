@@ -1,0 +1,30 @@
+# accounted-migrate (PQ-06): bootstrap.sql once, then every new migration, recorded in the Supabase
+# CLI's ledger. Runs after auth and storage have created their schemas (migrations reference
+# auth.users and storage.objects) and before PostgREST loads the schema.
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: migrations
+Requires=accounted-db.service accounted-auth.service accounted-storage.service
+After=accounted-db.service accounted-auth.service accounted-storage.service
+
+[Container]
+ContainerName=accounted-migrate
+Image=${ACCOUNTED_IMG_DB}
+Network=accounted.network
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=%h/.local/share/accounted/release/supabase:/accounted/supabase:ro
+Volume=%h/.local/share/accounted/release/migrate-in-container.sh:/accounted/migrate.sh:ro
+Secret=accounted-postgres-password,type=env,target=PGPASSWORD
+Environment=PGHOST=db
+Environment=PGUSER=postgres
+Environment=PGDATABASE=postgres
+Entrypoint=/bin/bash
+Exec=/accounted/migrate.sh
+NoNewPrivileges=true
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=default.target

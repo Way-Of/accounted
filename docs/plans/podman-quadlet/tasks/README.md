@@ -9,11 +9,11 @@ Every task is proven on the `dev` instance (Minisforum) before it touches `stagi
 | [PQ-01](PQ-01-config-contract.md) | Config contract, instances, port blocks, register claim | none | S | **done** 2026-11-17 |
 | [PQ-02](PQ-02-instance-users-installer.md) | Instance users and installer skeleton | PQ-01 | S | **code done**; waits on Craig creating `accounted-dev` |
 | [PQ-03](PQ-03-secrets.md) | Podman secrets, every upstream demo key replaced | PQ-02 | S | **code done**; real-store run waits on `accounted-dev` |
-| [PQ-04](PQ-04-supabase-stack.md) | Trimmed upstream Supabase stack as Quadlets, `upstream.lock`, drift check | PQ-03 | L | **started**: release pinned (v0.8.4) |
+| [PQ-04](PQ-04-supabase-stack.md) | Trimmed upstream Supabase stack as Quadlets, `upstream.lock`, drift check | PQ-03 | L | **running** on Hostinger qa + staging 2026-11-18; studio/meta, digests, upstream-diff.sh left |
 | [PQ-05](PQ-05-postgres-17.md) | Postgres 17 compatibility: full replay and pg-real on the 17 image | PQ-04 | M | todo |
-| [PQ-06](PQ-06-migrate.md) | `accounted-migrate`: `bootstrap.sql` once, then `supabase db push` | PQ-04 | S | todo |
-| [PQ-07](PQ-07-app-cron.md) | App and cron units | PQ-06 | M | todo |
-| [PQ-08](PQ-08-edge-single-origin.md) | Edge Caddy: one door, single-origin API, collision test | PQ-07 | S | todo |
+| [PQ-06](PQ-06-migrate.md) | `accounted-migrate`: `bootstrap.sql` once, then psql per file into the CLI ledger | PQ-04 | S | **done** 2026-11-18 (1088 on PG 17, idempotent re-run) |
+| [PQ-07](PQ-07-app-cron.md) | App and cron units | PQ-06 | M | **running** 2026-11-18 (pod with the edge) |
+| [PQ-08](PQ-08-edge-single-origin.md) | Edge Caddy: one door, single-origin API, collision test | PQ-07 | S | **running** 2026-11-18; collision test left |
 | [PQ-09](PQ-09-dev-parity.md) | `dev` parity walk-through | PQ-05, PQ-08 | L | todo |
 | [PQ-10](PQ-10-backup-restore.md) | Backups via `scripts/self-host/`, restore drill | PQ-09 | M | todo |
 | [PQ-11](PQ-11-hostinger.md) | Hostinger `staging` then `prod` behind the tunnel + Cloudflare Access | PQ-10, PQ-15, Reygan DPA | M | todo |

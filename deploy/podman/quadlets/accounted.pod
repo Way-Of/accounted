@@ -1,0 +1,15 @@
+# The app, its cron and the edge share one network namespace, so the edge's port is the same
+# origin inside the pod as in the browser: NEXT_PUBLIC_SUPABASE_URL works for both readers.
+# The only published port of the instance (PRD 6, Rule 24).
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: app pod
+
+[Pod]
+PodName=accounted
+Network=accounted-door.network
+Network=accounted.network
+PublishPort=${ACCOUNTED_BIND_HOST}:${ACCOUNTED_EDGE_PORT}:${ACCOUNTED_EDGE_PORT}
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+
+[Install]
+WantedBy=default.target

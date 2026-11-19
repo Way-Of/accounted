@@ -1,0 +1,9 @@
+# The pod's own network: the one place a published port can attach (an Internal network has no
+# gateway to forward to) and, until the egress door exists, the app's way out (PRD 6, deviation
+# recorded in DECISIONS.md 2026-11-18). Nothing but the accounted pod joins it.
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: door network for the pod
+
+[Network]
+NetworkName=accounted-door
+Label=accounted.instance=${ACCOUNTED_INSTANCE}

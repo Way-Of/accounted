@@ -38,7 +38,9 @@ command -v python3 >/dev/null || die "python3 is required (JWT signing reads the
 
 manifest_rows() { grep -vE '^\s*(#|$)' "$MANIFEST"; }
 exists() { podman secret inspect "$1" >/dev/null 2>&1; }
-read_secret() { podman secret inspect --showsecret --format '{{.SecretData}}' "$1"; }
+# podman prints the value followed by a newline; the containers get it without one, so the
+# JWTs must be signed over exactly that (command substitution strips the newline)
+read_secret() { local v; v="$(podman secret inspect --showsecret --format '{{.SecretData}}' "$1")"; printf '%s' "$v"; }
 
 is_demo() {
   local v="$1"

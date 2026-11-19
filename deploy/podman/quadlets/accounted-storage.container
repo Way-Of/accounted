@@ -1,0 +1,44 @@
+# storage-api, file backend on its own volume. Image transformation off: imgproxy is not run (PRD 5.2).
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: storage
+Requires=accounted-db.service
+After=accounted-db.service
+
+[Container]
+ContainerName=accounted-storage
+Image=${ACCOUNTED_IMG_STORAGE}
+Network=accounted.network
+NetworkAlias=storage
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=accounted-storage.volume:/var/lib/storage:Z
+Secret=accounted-anon-key,type=env,target=ANON_KEY
+Secret=accounted-service-role-key,type=env,target=SERVICE_KEY
+Secret=accounted-jwt-secret,type=env,target=AUTH_JWT_SECRET
+Secret=accounted-postgres-password,type=env,target=PGPASSWORD
+Secret=accounted-s3-protocol-key-id,type=env,target=S3_PROTOCOL_ACCESS_KEY_ID
+Secret=accounted-s3-protocol-key-secret,type=env,target=S3_PROTOCOL_ACCESS_KEY_SECRET
+Environment=POSTGREST_URL=http://rest:3000
+Environment=DATABASE_URL=postgres://supabase_storage_admin@db:5432/postgres
+Environment=STORAGE_PUBLIC_URL=${ACCOUNTED_PUBLIC_URL}
+Environment=REQUEST_ALLOW_X_FORWARDED_PATH=true
+Environment=FILE_SIZE_LIMIT=52428800
+Environment=STORAGE_BACKEND=file
+Environment=GLOBAL_S3_BUCKET=stub
+Environment=FILE_STORAGE_BACKEND_PATH=/var/lib/storage
+Environment=TENANT_ID=stub
+Environment=REGION=stub
+Environment=ENABLE_IMAGE_TRANSFORMATION=false
+HealthCmd=wget --no-verbose --tries=1 --spider http://127.0.0.1:5000/status
+HealthInterval=5s
+HealthRetries=10
+HealthStartPeriod=20s
+Notify=healthy
+NoNewPrivileges=true
+PodmanArgs=--memory=384m --pids-limit=200
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

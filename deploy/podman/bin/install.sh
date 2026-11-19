@@ -5,8 +5,10 @@
 #
 # Commands:
 #   render --out DIR   render the unit templates into DIR (any user; used by CI and tests)
-#   install            render into the user's Quadlet dir and daemon-reload
+#   pull               pull every image in upstream.lock into this user's store
+#   install            stage the release files, render into the user's Quadlet dir, daemon-reload
 #   start | stop       start or stop the instance's long-running units
+#   migrate            re-run accounted-migrate (after a new release), then restart rest
 #   status             unit states and the sockets this user listens on
 #   remove [--purge --yes]
 #                      uninstall the units; --purge also deletes volumes and secrets
@@ -17,6 +19,9 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 QUADLET_DIR="${ACCOUNTED_QUADLET_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd}"
+# The units mount release files from %h/.local/share/accounted (systemd expands %h); keep in step.
+ASSETS_DIR="$HOME/.local/share/accounted"
+REPO_DIR="$(cd "$ACCOUNTED_DEPLOY_DIR/../.." && pwd)"
 MANIFEST_NAME=".accounted-installed"
 
 inst="" cmd="" out="" purge=0 yes=0
@@ -27,14 +32,14 @@ while [ $# -gt 0 ]; do
     --out) out="${2:-}"; shift ;;
     --purge) purge=1 ;;
     --yes) yes=1 ;;
-    -h|--help) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    render|install|start|stop|status|remove) cmd="$1" ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    render|pull|install|start|stop|status|migrate|remove) cmd="$1" ;;
     *) die "unknown argument $1" ;;
   esac
   shift
 done
 [ -n "$inst" ] || die "--instance is required"
-[ -n "$cmd" ] || die "a command is required (render, install, start, stop, status, remove)"
+[ -n "$cmd" ] || die "a command is required (render, pull, install, start, stop, status, migrate, remove)"
 load_instance "$inst"
 
 templates() { find "$ACCOUNTED_DEPLOY_DIR/quadlets" -maxdepth 1 -type f | sort; }
@@ -45,6 +50,7 @@ service_of() {
   case "$f" in
     *.container) echo "${f%.container}.service" ;;
     *.network) echo "${f%.network}-network.service" ;;
+    *.pod) echo "${f%.pod}-pod.service" ;;
     *.volume) echo "${f%.volume}-volume.service" ;;
     *.timer|*.service) echo "$f" ;;
     *) echo "" ;;
@@ -68,6 +74,31 @@ render_all() {
   for t in $(templates); do render_template "$t" "$dir/$(basename "$t")"; done
 }
 
+# stage_release: the files the units mount, copied out of this checkout. Replaced whole on every
+# install so a release never mixes with the previous one's files. World-readable: the containers
+# run as their own users (postgres, nextjs, nobody) inside the instance's user namespace.
+stage_release() {
+  local new="$ASSETS_DIR.new"
+  rm -rf "$new"
+  mkdir -p "$new/release/supabase" "$new/release/edge"
+  cp -R "$ACCOUNTED_DEPLOY_DIR/upstream" "$new/upstream"
+  cp "$ACCOUNTED_DEPLOY_DIR/edge/Caddyfile" "$new/release/edge/Caddyfile"
+  cp "$ACCOUNTED_DEPLOY_DIR/bin/migrate-in-container.sh" "$new/release/migrate-in-container.sh"
+  cp "$REPO_DIR/supabase/bootstrap.sql" "$new/release/supabase/bootstrap.sql"
+  mkdir -p "$new/release/supabase/migrations"
+  cp "$REPO_DIR"/supabase/migrations/*.sql "$new/release/supabase/migrations/"
+  cp "$REPO_DIR/docker/crontab.self-hosted" "$new/release/crontab"
+  # a git checkout names its commit; a copied tree carries a REVISION file written by whoever copied it
+  git -C "$REPO_DIR" rev-parse HEAD > "$new/release/COMMIT" 2>/dev/null \
+    || cp "$REPO_DIR/REVISION" "$new/release/COMMIT" 2>/dev/null || echo unknown > "$new/release/COMMIT"
+  chmod -R a+rX,go-w "$new"
+  rm -rf "$ASSETS_DIR.old"
+  [ -d "$ASSETS_DIR" ] && mv "$ASSETS_DIR" "$ASSETS_DIR.old"
+  mv "$new" "$ASSETS_DIR"
+  rm -rf "$ASSETS_DIR.old"
+  note "staged release $(cut -c1-9 "$ASSETS_DIR/release/COMMIT") ($(ls "$ASSETS_DIR/release/supabase/migrations" | wc -l) migrations) into $ASSETS_DIR"
+}
+
 # every socket this user owns must be on loopback (Rule 24: a door is named, or it is closed)
 check_loopback() {
   local wide
@@ -85,8 +116,25 @@ case "$cmd" in
     render_all "$out"
     note "rendered $(templates | wc -l) unit(s) for $inst into $out"
     ;;
+  pull)
+    require_user
+    for var in $(compgen -v ACCOUNTED_IMG_); do
+      podman image exists "${!var}" || podman pull -q "${!var}" >/dev/null
+      printf '%-24s %s\n' "${var#ACCOUNTED_IMG_}" "$(podman image inspect --format '{{.Digest}}' "${!var}")"
+    done
+    for var in ACCOUNTED_IMAGE ACCOUNTED_CRON_IMAGE; do
+      podman image exists "${!var}" || note "missing ${!var}: build it, then podman save | podman load it into this user"
+    done
+    ;;
+  migrate)
+    require_user
+    systemctl --user restart accounted-migrate.service
+    systemctl --user restart accounted-rest.service
+    journalctl --user -u accounted-migrate.service -n 3 --no-pager -o cat
+    ;;
   install)
     require_user
+    stage_release
     mkdir -p "$QUADLET_DIR"
     stage="$(mktemp -d)"; trap 'rm -rf "$stage"' EXIT
     render_all "$stage"

@@ -6,7 +6,7 @@
 
 ACCOUNTED_DEPLOY_DIR="${ACCOUNTED_DEPLOY_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ACCOUNTED_HOST_CONFIG="${ACCOUNTED_HOST_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/accounted/instance.env}"
-ACCOUNTED_INSTANCES="dev staging prod"
+ACCOUNTED_INSTANCES="dev qa staging prod"
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 note() { printf '%s\n' "$*" >&2; }
@@ -36,8 +36,25 @@ load_instance() {
   load_env_file "$ACCOUNTED_HOST_CONFIG"
   load_env_file "$ACCOUNTED_DEPLOY_DIR/internal-ports.env"
   load_env_file "$defaults"
+  load_lock
   [ "${ACCOUNTED_INSTANCE:-}" = "$name" ] || die "instance mismatch: ACCOUNTED_INSTANCE=${ACCOUNTED_INSTANCE:-} but asked for $name (check $ACCOUNTED_HOST_CONFIG)"
   validate_ports
+}
+
+# load_lock: export ACCOUNTED_IMG_<UNIT> for every image row in upstream.lock (the one place an
+# image reference lives). A reference without a registry is Docker Hub's, written out in full so
+# rootless Podman never consults a short-name alias list.
+load_lock() {
+  local lock="$ACCOUNTED_DEPLOY_DIR/upstream.lock" line key ref var
+  [ -r "$lock" ] || die "missing $lock"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*|release=*) continue ;; esac
+    key="${line%%=*}" ref="${line#*=}"
+    [[ "$key" =~ ^[a-z][a-z0-9_]*$ ]] || die "$lock: bad key '$key'"
+    case "${ref%%/*}" in *.*|localhost) ;; *) ref="docker.io/$ref" ;; esac
+    var="ACCOUNTED_IMG_$(tr '[:lower:]' '[:upper:]' <<<"$key")"
+    [ -n "${!var+x}" ] || export "$var=$ref"
+  done < "$lock"
 }
 
 # validate_ports: every published port is five digits inside 10000-32767 and inside

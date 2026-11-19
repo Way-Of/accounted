@@ -15,3 +15,5 @@ gateway=envoyproxy/envoy:v1.39.6
 # Not converted at this release: imgproxy (0 storage transforms), functions (0 invokes),
 # supavisor (no direct Postgres client in src/), and the optional logs overlay
 # (docker-compose.logs.yml: analytics/Logflare + vector, which mounts the Docker socket).
+# Ours, not upstream's: the edge (PRD 6). Same pinned image as docker/compose.caddy.yml.
+edge=library/caddy:2-alpine@sha256:86deaf5e3d3408a6ccec08fbb79989783dd26e206ae10bcf78a801dc8c9ab794

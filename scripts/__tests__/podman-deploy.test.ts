@@ -53,7 +53,8 @@ case "$sub" in
   inspect)
     show=0; while [ "$1" != "\${1#--}" ]; do [ "$1" = --showsecret ] && show=1; [ "$1" = --format ] && shift; shift; done
     [ -f "$store/$1" ] || exit 125
-    [ $show = 1 ] && cat "$store/$1"; exit 0 ;;
+    # real podman ends --showsecret output with a newline the containers never see
+    [ $show = 1 ] && { cat "$store/$1"; echo; }; exit 0 ;;
   create)
     while [ "$1" != "\${1#--}" ]; do [ "$1" = --label ] && shift; shift; done
     [ -f "$store/$1" ] && { echo "exists" >&2; exit 125; }
@@ -142,9 +143,53 @@ describe('instance config', () => {
     expect(r.out).toContain("refusing key 'PATH'")
   })
 
+  it('publishes exactly one port per instance: the edge, on loopback, from the pod', () => {
+    for (const [inst, port] of [['dev', 21230], ['qa', 26791], ['staging', 26219], ['prod', 17166]] as const) {
+      const out = tmp()
+      expect(run('install.sh', ['--instance', inst, 'render', '--out', out]).code).toBe(0)
+      const published = readdirSync(out).flatMap((f) =>
+        readFileSync(path.join(out, f), 'utf8')
+          .split('\n')
+          .filter((l) => l.startsWith('PublishPort='))
+          .map((l) => `${f} ${l}`),
+      )
+      const onDemand = published.filter((l) => /studio|db-admin/.test(l))
+      expect(published.filter((l) => !onDemand.includes(l))).toEqual([
+        `accounted.pod PublishPort=127.0.0.1:${port}:${port}`,
+      ])
+    }
+  })
+
+  it('takes every image from upstream.lock or the instance file, fully qualified', () => {
+    const tpl = path.join(DEPLOY, 'quadlets')
+    const out = tmp()
+    expect(run('install.sh', ['--instance', 'qa', 'render', '--out', out]).code).toBe(0)
+    for (const f of readdirSync(tpl).filter((n) => n.endsWith('.container'))) {
+      const image = readFileSync(path.join(tpl, f), 'utf8').match(/^Image=(.*)$/m)?.[1]
+      expect(image, f).toMatch(/^\$\{ACCOUNTED_(IMG_[A-Z]+|IMAGE|CRON_IMAGE)\}$/)
+      const rendered = readFileSync(path.join(out, f), 'utf8').match(/^Image=(.*)$/m)?.[1]
+      expect(rendered, f).toMatch(/^(docker\.io|localhost)\//)
+    }
+  })
+
+  it('reads only secrets that secrets.manifest makes', () => {
+    const made = new Set(
+      readFileSync(path.join(DEPLOY, 'secrets.manifest'), 'utf8')
+        .split('\n')
+        .filter((l) => l.trim() && !l.startsWith('#'))
+        .map((l) => l.split(/\s+/)[0]),
+    )
+    const tpl = path.join(DEPLOY, 'quadlets')
+    for (const f of readdirSync(tpl)) {
+      for (const m of readFileSync(path.join(tpl, f), 'utf8').matchAll(/^Secret=([^,\n]+)/gm)) {
+        expect(made.has(m[1]), `${f}: ${m[1]}`).toBe(true)
+      }
+    }
+  })
+
   it('refuses an unknown instance', () => {
-    const r = run('install.sh', ['--instance', 'qa', 'render', '--out', tmp()])
-    expect(r.out).toContain("unknown instance 'qa'")
+    const r = run('install.sh', ['--instance', 'uat', 'render', '--out', tmp()])
+    expect(r.out).toContain("unknown instance 'uat'")
   })
 })
 
@@ -162,10 +207,21 @@ describe('install.sh', () => {
     writeFileSync(path.join(qdir, '.accounted-installed'), 'accounted-old.container\n')
     writeFileSync(path.join(qdir, 'accounted-old.container'), '[Container]\n')
     writeFileSync(path.join(qdir, 'unrelated.container'), '[Container]\n')
-    const env = { PATH: `${s.bin}:${process.env.PATH}`, ACCOUNTED_USER: ME, ACCOUNTED_QUADLET_DIR: qdir }
+    const home = path.join(s.root, 'home')
+    mkdirSync(home)
+    const env = { PATH: `${s.bin}:${process.env.PATH}`, HOME: home, ACCOUNTED_USER: ME, ACCOUNTED_QUADLET_DIR: qdir }
 
     const r = run('install.sh', ['--instance', 'dev', 'install'], env)
     expect(r.code).toBe(0)
+    // the release files the units mount from %h/.local/share/accounted
+    const release = path.join(home, '.local/share/accounted/release')
+    const repoMigrations = readdirSync(path.join(REPO, 'supabase/migrations')).filter((f) => f.endsWith('.sql'))
+    expect(readdirSync(path.join(release, 'supabase/migrations')).sort()).toEqual(repoMigrations.sort())
+    expect(existsSync(path.join(release, 'supabase/bootstrap.sql'))).toBe(true)
+    expect(existsSync(path.join(release, 'edge/Caddyfile'))).toBe(true)
+    expect(existsSync(path.join(release, 'crontab'))).toBe(true)
+    expect(existsSync(path.join(home, '.local/share/accounted/upstream/db/roles.sql'))).toBe(true)
+    expect(readFileSync(path.join(release, 'COMMIT'), 'utf8').trim()).not.toBe('')
     expect(existsSync(path.join(qdir, 'accounted.network'))).toBe(true)
     expect(existsSync(path.join(qdir, 'accounted-old.container'))).toBe(false)
     expect(existsSync(path.join(qdir, 'unrelated.container'))).toBe(true)

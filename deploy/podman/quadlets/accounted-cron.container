@@ -1,0 +1,26 @@
+# Scheduled jobs: supercronic calling the app inside the pod with CRON_SECRET (vercel.json crons).
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: cron
+Wants=accounted-app.service
+After=accounted-app.service
+
+[Container]
+ContainerName=accounted-cron
+Image=${ACCOUNTED_CRON_IMAGE}
+Pod=accounted.pod
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=%h/.local/share/accounted/release/crontab:/etc/supercronic/crontab:ro
+Tmpfs=/tmp
+Secret=accounted-cron-secret,type=env,target=CRON_SECRET
+Environment=APP_URL=http://127.0.0.1:${ACCOUNTED_INTERNAL_APP_PORT}
+RunInit=true
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+PodmanArgs=--memory=64m --pids-limit=30
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

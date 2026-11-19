@@ -1,0 +1,26 @@
+# accounted-edge: the instance's one door (PRD 6). Listens inside the accounted pod on the
+# instance's edge port, so the browser and the app's server both reach the same origin
+# (NEXT_PUBLIC_SUPABASE_URL is baked once and read by both).
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		# the host Caddy or a tunnel connector in front sets X-Forwarded-*; trust loopback and the pod only
+		trusted_proxies static 127.0.0.1/8 ::1 10.0.0.0/8
+	}
+}
+
+:{$ACCOUNTED_EDGE_PORT} {
+	log {
+		output stdout
+		format console
+	}
+	@supabase path /auth/v1/* /rest/v1/* /storage/v1/* /realtime/v1/*
+	handle @supabase {
+		reverse_proxy api-gw:8000
+	}
+	handle {
+		reverse_proxy 127.0.0.1:{$ACCOUNTED_INTERNAL_APP_PORT}
+	}
+}

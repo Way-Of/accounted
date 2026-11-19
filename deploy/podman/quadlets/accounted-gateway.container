@@ -1,0 +1,38 @@
+# The Supabase API gateway: upstream's Envoy config, unchanged (apikey check, routing, realtime host
+# rewrite). Reached only by the edge and the app, by the names api-gw / kong / envoy.
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: API gateway (Envoy)
+Wants=accounted-auth.service accounted-rest.service accounted-storage.service accounted-realtime.service
+After=accounted-auth.service accounted-rest.service accounted-storage.service accounted-realtime.service
+
+[Container]
+ContainerName=accounted-gateway
+Image=${ACCOUNTED_IMG_GATEWAY}
+Network=accounted.network
+NetworkAlias=api-gw
+NetworkAlias=kong
+NetworkAlias=envoy
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=%h/.local/share/accounted/upstream/envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+Volume=%h/.local/share/accounted/upstream/envoy/cds.yaml:/etc/envoy/cds.yaml:ro
+Volume=%h/.local/share/accounted/upstream/envoy/lds.template.yaml:/etc/envoy/lds.template.yaml:ro
+Volume=%h/.local/share/accounted/upstream/envoy/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+Secret=accounted-anon-key,type=env,target=ANON_KEY
+Secret=accounted-service-role-key,type=env,target=SERVICE_ROLE_KEY
+Secret=accounted-dashboard-password,type=env,target=DASHBOARD_PASSWORD
+Environment=DASHBOARD_USERNAME=supabase
+Environment=SUPABASE_PUBLIC_URL=${ACCOUNTED_PUBLIC_URL}
+Entrypoint=/bin/sh
+Exec=/docker-entrypoint.sh
+HealthCmd=bash -c '</dev/tcp/127.0.0.1/8000'
+HealthInterval=10s
+HealthRetries=5
+NoNewPrivileges=true
+PodmanArgs=--memory=256m --pids-limit=200
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

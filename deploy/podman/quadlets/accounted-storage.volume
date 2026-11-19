@@ -1,0 +1,4 @@
+# documents and files (storage-api file backend)
+[Volume]
+VolumeName=accounted-storage
+Label=accounted.instance=${ACCOUNTED_INSTANCE}

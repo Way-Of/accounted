@@ -1,0 +1,4 @@
+# the app's runtime copy of the Next bundle; rebuilt at every start, never backed up
+[Volume]
+VolumeName=accounted-next
+Label=accounted.instance=${ACCOUNTED_INSTANCE}

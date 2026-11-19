@@ -6,7 +6,7 @@
 > cache. The PRD holds the reasoning; this file holds where we are and what is next.
 
 ```
-handoff{ "branch": "podman-conversion-and-staging-push", "base": "b0b481b9d", "updated": "2026-11-17" }
+handoff{ "branch": "podman-conversion-and-staging-push", "base": "b0b481b9d", "updated": "2026-11-18" }
 ```
 
 ## Where we are
@@ -16,8 +16,9 @@ phase_status:
   "PRD","revision 2: docs/plans/podman-quadlet/PRD.md (official Supabase self-hosted stack, trimmed, PG 17)"
   "Tasks","15 slices: docs/plans/podman-quadlet/tasks/ (PQ-01..PQ-15); statuses in tasks/README.md"
   "Diagrams","docs/plans/podman-quadlet/ARCHITECTURE.md"
-  "Built","PQ-01 done; PQ-02 + PQ-03 code done (deploy/podman/bin/*, 23 tests in scripts/__tests__/podman-deploy.test.ts); PQ-04 started: upstream pinned at self-hosted/v0.8.4"
-  "Blocked on Craig","create the accounted-dev user (prepare-host.sh prints the root steps); decide Q8 (Infisical parked)"
+  "Built","PQ-01..03 done; PQ-04 (stack), PQ-06 (migrate), PQ-07 (app, cron), PQ-08 (edge) built and running on Hostinger"
+  "Live","qa (accounted-qa, 127.0.0.1:26791) and staging (accounted-staging, 127.0.0.1:26219) on Hostinger, healthy, 1088 migrations; loopback only, no hostname yet"
+  "Blocked on Craig","hostnames + Cloudflare Access for qa/staging; Q8; commit/push of the 2026-11-18 deploy work; first real accounts"
   "Remotes","GitHub only; both Forgejos wait on credentials (see Remotes below)"
 ```
 
@@ -50,6 +51,22 @@ phase_status:
   `SecurityLabelDisable=true`, plaintext env files.
 - Claude subagents are blocked by a house hook; delegate through Eindri or work inline.
 
+## Running now (2026-11-18)
+
+- Release tree: `/opt/way-of/accounted` (root-owned copy of the working tree, `REVISION` names the commit +
+  worktree time). Images built as `craig` (`localhost/accounted:527f026`, `localhost/accounted-cron:527f026`)
+  and loaded into each instance user with `podman save | podman load`.
+- Run as an instance user from `craig`: `~/bin/asu <qa|staging> '<command>'` (sudo -u with the user's
+  systemd bus). Install: `install.sh --instance <i> install|start|status|migrate`.
+- Reach a door from the Mac: `ssh -L 26791:127.0.0.1:26791 hostinger` then http://127.0.0.1:26791 (qa);
+  26219 for staging. The browser must use that exact origin (it is baked into the bundle at start).
+- Proven per instance (throwaway user, removed): admin create, password sign-in, rest as the user (200),
+  `/auth/v1/user`, storage, realtime ping, public sign-up refused (`signup_disabled`), owned sockets loopback only.
+- Josef's Docker instance (`/srv/accounted`, accounted.veyral.io) left as is except sign-up closed
+  (`.env.bak-signup-20261118-223448`); Josef emailed.
+- Not built yet: studio/meta units (on demand), backups (PQ-10), egress door, upstream-diff.sh, image digests
+  in `upstream.lock` (pulled digests are in `install.sh pull` output), SMTP.
+
 ## Next actions
 
 1. Craig: `deploy/podman/bin/prepare-host.sh --instance dev`, run the printed root steps (user, subids, linger).
@@ -69,5 +86,5 @@ phase_status:
 
 ## Not live
 
-Nothing is live. No instance user exists, no unit is installed, no secret created, no port claimed in
-`$YMIR_HOME/config/services.yaml` (that file does not exist yet on the Minisforum).
+qa and staging run on Hostinger loopback only: no hostname, no tunnel, no Cloudflare Access, no SMTP,
+no backups, no real accounts. dev (Minisforum) and prod are not installed.

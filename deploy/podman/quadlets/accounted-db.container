@@ -1,0 +1,40 @@
+# Postgres 17 from the pinned Supabase release (PRD 5.2), with upstream's init SQL minus analytics
+# and pooler. Never published: the on-demand admin port is a separate decision (block +2).
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: database
+
+[Container]
+ContainerName=accounted-db
+Image=${ACCOUNTED_IMG_DB}
+Network=accounted.network
+NetworkAlias=db
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=accounted-db.volume:/var/lib/postgresql/data:Z
+Volume=accounted-db-config.volume:/etc/postgresql-custom:Z
+Volume=%h/.local/share/accounted/upstream/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+Volume=%h/.local/share/accounted/upstream/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:ro
+Volume=%h/.local/share/accounted/upstream/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+Volume=%h/.local/share/accounted/upstream/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+Secret=accounted-postgres-password,type=env,target=POSTGRES_PASSWORD
+Secret=accounted-postgres-password,type=env,target=PGPASSWORD
+Environment=POSTGRES_HOST=/var/run/postgresql
+Environment=PGPORT=5432
+Environment=POSTGRES_PORT=5432
+Environment=PGDATABASE=postgres
+Environment=POSTGRES_DB=postgres
+Environment=JWT_EXP=3600
+Exec=postgres -c config_file=/etc/postgresql/postgresql.conf -c log_min_messages=fatal
+HealthCmd=pg_isready -U postgres -h localhost
+HealthInterval=5s
+HealthRetries=10
+HealthStartPeriod=30s
+Notify=healthy
+NoNewPrivileges=true
+PodmanArgs=--memory=1536m --pids-limit=400 --shm-size=256m
+
+[Service]
+Restart=always
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

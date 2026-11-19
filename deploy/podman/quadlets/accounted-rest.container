@@ -1,0 +1,35 @@
+# PostgREST. Starts after the migrations so its first schema load already sees them.
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: rest (PostgREST)
+Requires=accounted-db.service accounted-migrate.service
+After=accounted-db.service accounted-migrate.service
+
+[Container]
+ContainerName=accounted-rest
+Image=${ACCOUNTED_IMG_REST}
+Network=accounted.network
+NetworkAlias=rest
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Secret=accounted-postgres-password,type=env,target=PGPASSWORD
+Secret=accounted-jwt-secret,type=env,target=PGRST_JWT_SECRET
+Environment=PGRST_DB_URI=postgres://authenticator@db:5432/postgres
+Environment=PGRST_DB_SCHEMAS=public,graphql_public
+Environment=PGRST_DB_MAX_ROWS=1000
+Environment=PGRST_DB_EXTRA_SEARCH_PATH=public
+Environment=PGRST_DB_ANON_ROLE=anon
+Environment=PGRST_ADMIN_SERVER_PORT=3001
+Environment=PGRST_ADMIN_SERVER_HOST=localhost
+Environment=PGRST_DB_USE_LEGACY_GUCS=false
+Environment=PGRST_APP_SETTINGS_JWT_EXP=3600
+Exec=postgrest
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+PodmanArgs=--memory=256m --pids-limit=200
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
