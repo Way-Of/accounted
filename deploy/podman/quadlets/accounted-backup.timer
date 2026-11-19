@@ -1,0 +1,13 @@
+# accounted-backup.timer (PQ-10): nightly backup set. A plain systemd timer, so install.sh places it
+# in the user's systemd directory, not the Quadlet one, and enables it.
+# accounted:needs ACCOUNTED_BACKUP_TARGET
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: nightly backup
+
+[Timer]
+OnCalendar=${ACCOUNTED_BACKUP_ON_CALENDAR}
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

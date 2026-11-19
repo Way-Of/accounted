@@ -163,7 +163,7 @@ describe('instance config', () => {
   it('takes every image from upstream.lock or the instance file, fully qualified', () => {
     const tpl = path.join(DEPLOY, 'quadlets')
     const out = tmp()
-    expect(run('install.sh', ['--instance', 'qa', 'render', '--out', out]).code).toBe(0)
+    expect(run('install.sh', ['--instance', 'staging', 'render', '--out', out]).code).toBe(0)
     for (const f of readdirSync(tpl).filter((n) => n.endsWith('.container'))) {
       const image = readFileSync(path.join(tpl, f), 'utf8').match(/^Image=(.*)$/m)?.[1]
       expect(image, f).toMatch(/^\$\{ACCOUNTED_(IMG_[A-Z]+|IMAGE|CRON_IMAGE)\}$/)
@@ -185,6 +185,21 @@ describe('instance config', () => {
         expect(made.has(m[1]), `${f}: ${m[1]}`).toBe(true)
       }
     }
+  })
+
+  it('renders the backup units only for an instance with a backup target', () => {
+    const none = tmp()
+    expect(run('install.sh', ['--instance', 'qa', 'render', '--out', none]).code).toBe(0)
+    expect(readdirSync(none).filter((f) => f.startsWith('accounted-backup'))).toEqual([])
+
+    const out = tmp()
+    expect(run('install.sh', ['--instance', 'staging', 'render', '--out', out]).code).toBe(0)
+    const unit = readFileSync(path.join(out, 'accounted-backup.container'), 'utf8')
+    expect(unit).toContain('Volume=/srv/backups/accounted-staging:/backup/out:Z')
+    expect(unit).toContain('Volume=accounted-storage.volume:/backup/storage:ro')
+    expect(unit).toContain('Volume=accounted-db-config.volume:/backup/db-config:ro')
+    expect(unit).not.toMatch(/^\[Install\]/m)
+    expect(readFileSync(path.join(out, 'accounted-backup.timer'), 'utf8')).toContain('OnCalendar=*-*-* 02:30:00 UTC')
   })
 
   it('refuses an unknown instance', () => {
@@ -227,6 +242,28 @@ describe('install.sh', () => {
     expect(existsSync(path.join(qdir, 'unrelated.container'))).toBe(true)
     expect(readFileSync(path.join(qdir, '.accounted-installed'), 'utf8')).toContain('accounted.network')
     expect(readFileSync(path.join(s.root, 'systemctl.log'), 'utf8')).toContain('--user daemon-reload')
+    // the backup tooling the backup unit mounts is staged too
+    for (const f of ['backup-in-container.sh', 'self-host/backup.sh', 'self-host/restore.sh', 'self-host/acl-manifest.sql']) {
+      expect(existsSync(path.join(release, f))).toBe(true)
+    }
+  })
+
+  it('puts the backup timer in the systemd user dir and enables it', () => {
+    const s = shims()
+    const qdir = path.join(s.root, 'quadlets')
+    const udir = path.join(s.root, 'systemd-user')
+    const home = path.join(s.root, 'home')
+    mkdirSync(home)
+    const env = {
+      PATH: `${s.bin}:${process.env.PATH}`, HOME: home, ACCOUNTED_USER: ME,
+      ACCOUNTED_QUADLET_DIR: qdir, ACCOUNTED_SYSTEMD_USER_DIR: udir, ACCOUNTED_BACKUP_TARGET: path.join(s.root, 'bk'),
+    }
+    const r = run('install.sh', ['--instance', 'dev', 'install'], env)
+    expect(r.code).toBe(0)
+    expect(existsSync(path.join(udir, 'accounted-backup.timer'))).toBe(true)
+    expect(existsSync(path.join(qdir, 'accounted-backup.timer'))).toBe(false)
+    expect(existsSync(path.join(qdir, 'accounted-backup.container'))).toBe(true)
+    expect(readFileSync(path.join(s.root, 'systemctl.log'), 'utf8')).toContain('--user enable --now accounted-backup.timer')
   })
 
   it('fails start when this user owns a non-loopback socket', () => {

@@ -19,6 +19,8 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 QUADLET_DIR="${ACCOUNTED_QUADLET_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/containers/systemd}"
+# plain systemd units (the backup timer) are not Quadlet files: they live in the user's unit dir
+SYSTEMD_USER_DIR="${ACCOUNTED_SYSTEMD_USER_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
 # The units mount release files from %h/.local/share/accounted (systemd expands %h); keep in step.
 ASSETS_DIR="$HOME/.local/share/accounted"
 REPO_DIR="$(cd "$ACCOUNTED_DEPLOY_DIR/../.." && pwd)"
@@ -68,10 +70,18 @@ long_running() {
   done
 }
 
+# a template marked "# accounted:needs VAR" is rendered only when the instance sets VAR
+wanted() {
+  local var
+  var="$(sed -n 's/^# accounted:needs \([A-Z0-9_]*\)$/\1/p' "$1")"
+  [ -z "$var" ] || [ -n "${!var:-}" ]
+}
+
 render_all() {
   local dir="$1" t
   mkdir -p "$dir"
-  for t in $(templates); do render_template "$t" "$dir/$(basename "$t")"; done
+  for t in $(templates); do wanted "$t" && render_template "$t" "$dir/$(basename "$t")"; done
+  return 0
 }
 
 # stage_release: the files the units mount, copied out of this checkout. Replaced whole on every
@@ -84,6 +94,9 @@ stage_release() {
   cp -R "$ACCOUNTED_DEPLOY_DIR/upstream" "$new/upstream"
   cp "$ACCOUNTED_DEPLOY_DIR/edge/Caddyfile" "$new/release/edge/Caddyfile"
   cp "$ACCOUNTED_DEPLOY_DIR/bin/migrate-in-container.sh" "$new/release/migrate-in-container.sh"
+  cp "$ACCOUNTED_DEPLOY_DIR/bin/backup-in-container.sh" "$new/release/backup-in-container.sh"
+  mkdir -p "$new/release/self-host"
+  cp "$REPO_DIR"/scripts/self-host/{backup.sh,restore.sh,acl-manifest.sql} "$new/release/self-host/"
   cp "$REPO_DIR/supabase/bootstrap.sql" "$new/release/supabase/bootstrap.sql"
   mkdir -p "$new/release/supabase/migrations"
   cp "$REPO_DIR"/supabase/migrations/*.sql "$new/release/supabase/migrations/"
@@ -141,17 +154,26 @@ case "$cmd" in
     manifest="$QUADLET_DIR/$MANIFEST_NAME"
     if [ -r "$manifest" ]; then
       while IFS= read -r old; do
-        [ -e "$stage/$old" ] || { rm -f "$QUADLET_DIR/$old"; note "removed stale unit $old"; }
+        [ -e "$stage/$old" ] && continue
+        case "$old" in *.timer) systemctl --user disable --now "$old" 2>/dev/null || true ;; esac
+        rm -f "$QUADLET_DIR/$old" "$SYSTEMD_USER_DIR/$old"; note "removed stale unit $old"
       done < "$manifest"
     fi
     : > "$manifest.new"
     for f in "$stage"/*; do
       [ -e "$f" ] || continue
-      install -m 0644 "$f" "$QUADLET_DIR/$(basename "$f")"
+      case "$f" in
+        *.timer) mkdir -p "$SYSTEMD_USER_DIR"; install -m 0644 "$f" "$SYSTEMD_USER_DIR/$(basename "$f")" ;;
+        *) install -m 0644 "$f" "$QUADLET_DIR/$(basename "$f")" ;;
+      esac
       basename "$f" >> "$manifest.new"
     done
     mv "$manifest.new" "$manifest"
     systemctl --user daemon-reload
+    for f in "$stage"/*.timer; do
+      [ -e "$f" ] || continue
+      systemctl --user enable --now "$(basename "$f")" >/dev/null 2>&1 && note "enabled $(basename "$f")"
+    done
     note "installed $(wc -l < "$manifest") unit(s) for $inst into $QUADLET_DIR"
     ;;
   start)

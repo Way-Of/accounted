@@ -1,0 +1,34 @@
+# accounted-backup (PQ-10): one backup set (database dump, ACL manifest, documents, db-config with
+# the pgsodium root key, checksums) into the instance's backup directory, started by
+# accounted-backup.timer. Installed only when the instance sets ACCOUNTED_BACKUP_TARGET.
+# accounted:needs ACCOUNTED_BACKUP_TARGET
+[Unit]
+Description=Accounted ${ACCOUNTED_INSTANCE}: backup set
+Requires=accounted-db.service
+After=accounted-db.service accounted-storage.service
+
+[Container]
+ContainerName=accounted-backup
+Image=${ACCOUNTED_IMG_DB}
+Network=accounted.network
+Label=accounted.instance=${ACCOUNTED_INSTANCE}
+Volume=%h/.local/share/accounted/release/self-host:/backup/bin:ro
+Volume=%h/.local/share/accounted/release/backup-in-container.sh:/backup/run.sh:ro
+Volume=accounted-storage.volume:/backup/storage:ro
+Volume=accounted-db-config.volume:/backup/db-config:ro
+Volume=${ACCOUNTED_BACKUP_TARGET}:/backup/out:Z
+Secret=accounted-postgres-password,type=env,target=PGPASSWORD
+Environment=PGHOST=db
+Environment=PGUSER=postgres
+Environment=PGDATABASE=postgres
+Environment=ACCOUNTED_INSTANCE=${ACCOUNTED_INSTANCE}
+Environment=ACCOUNTED_BACKUP_KEEP_DAYS=${ACCOUNTED_BACKUP_KEEP_DAYS}
+Entrypoint=/bin/bash
+Exec=/backup/run.sh
+NoNewPrivileges=true
+DropCapability=ALL
+AddCapability=DAC_READ_SEARCH
+
+[Service]
+Type=oneshot
+TimeoutStartSec=3600

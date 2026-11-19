@@ -17,6 +17,8 @@
 #                            `postgres` role, the one the migrations ran as.
 #   BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, AWS_ACCESS_KEY_ID,
 #   AWS_SECRET_ACCESS_KEY, BACKUP_S3_REGION, BACKUP_S3_PREFIX   as in backup.sh
+#   BACKUP_LOCAL_DIR         optional, instead of the S3 variables: read the set from
+#                            <dir>/<prefix>/<name>/ (what backup.sh BACKUP_LOCAL_DIR wrote)
 #   RESTORE_STORAGE_DIR      optional: where to unpack the storage archive
 #                            (the new stack's <supabase-dir>/volumes/storage).
 #   RESTORE_DB_CONFIG_VOLUME optional: Docker volume name to unpack the
@@ -77,15 +79,18 @@ SKIP_DB="${RESTORE_SKIP_DATABASE:-0}"
 if [ "$SKIP_DB" != "1" ]; then
   : "${RESTORE_DATABASE_URL:?RESTORE_DATABASE_URL is required (or set RESTORE_SKIP_DATABASE=1)}"
 fi
-: "${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT is required}"
-: "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET is required}"
-: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}"
-: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}"
+if [ -z "${BACKUP_LOCAL_DIR:-}" ]; then
+  : "${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT is required (or set BACKUP_LOCAL_DIR)}"
+  : "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET is required}"
+  : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}"
+  : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}"
+fi
 
 export AWS_DEFAULT_REGION="${BACKUP_S3_REGION:-us-east-1}"
 PREFIX="${BACKUP_S3_PREFIX:-accounted}"
 
-for bin in pg_restore psql tar gzip aws; do
+TOOLS="pg_restore psql tar gzip"; [ -n "${BACKUP_LOCAL_DIR:-}" ] || TOOLS="$TOOLS aws"
+for bin in $TOOLS; do
   command -v "$bin" >/dev/null 2>&1 || { echo "restore: missing required tool: $bin" >&2; exit 2; }
 done
 if command -v sha256sum >/dev/null 2>&1; then SHA="sha256sum"; else SHA="shasum -a 256"; fi
@@ -94,16 +99,22 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK="${RESTORE_WORKDIR:-$(mktemp -d "${TMPDIR:-/tmp}/accounted-restore.XXXXXX")}"
 mkdir -p "$WORK"
 chmod 700 "$WORK"
-cleanup() { [ -z "${RESTORE_WORKDIR:-}" ] && rm -rf "$WORK"; }
+# an if, not "[ ] &&": under set -e a trap ending on a false test turns a clean run into exit 1
+cleanup() { if [ -z "${RESTORE_WORKDIR:-}" ]; then rm -rf "$WORK"; fi; }
 trap cleanup EXIT
 
 fetch() {
   # fetch <file-name> -> downloads into $WORK, returns 1 when the key is absent
+  if [ -n "${BACKUP_LOCAL_DIR:-}" ]; then
+    [ -f "${BACKUP_LOCAL_DIR}/${PREFIX}/${NAME}/$1" ] || return 1
+    cp "${BACKUP_LOCAL_DIR}/${PREFIX}/${NAME}/$1" "${WORK}/$1"
+    return
+  fi
   aws s3api get-object --endpoint-url "$BACKUP_S3_ENDPOINT" --bucket "$BACKUP_S3_BUCKET" \
     --key "${PREFIX}/${NAME}/$1" "${WORK}/$1" >/dev/null 2>&1
 }
 
-echo "restore: fetching ${NAME} from s3://${BACKUP_S3_BUCKET}/${PREFIX}/${NAME}/"
+echo "restore: fetching ${NAME} from ${BACKUP_LOCAL_DIR:-s3://${BACKUP_S3_BUCKET:-}}/${PREFIX}/${NAME}/"
 fetch "${NAME}.sha256" || { echo "restore: no manifest found for ${NAME}" >&2; exit 1; }
 fetch "${NAME}.db.dump" || { echo "restore: database dump missing" >&2; exit 1; }
 HAVE_ACL=0; fetch "${NAME}.acl.txt" && HAVE_ACL=1

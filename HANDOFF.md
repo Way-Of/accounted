@@ -64,7 +64,9 @@ phase_status:
   `/auth/v1/user`, storage, realtime ping, public sign-up refused (`signup_disabled`), owned sockets loopback only.
 - Josef's Docker instance (`/srv/accounted`, accounted.veyral.io) left as is except sign-up closed
   (`.env.bak-signup-20261118-223448`); Josef emailed.
-- Not built yet: studio/meta units (on demand), backups (PQ-10), egress door, upstream-diff.sh, image digests
+- Backups (PQ-10): staging nightly 02:30 UTC (`accounted-backup.timer`) to `/srv/backups/accounted-staging`, 14 days kept, checksums verified each run; a db-only restore drill matched public schema counts and all 916 ACLs. Left: full-stack drill (auth users, storage), off-host copy, yearly BFL archive.
+- Staging is the home of Reygan's 30-day trial with real data (Craig, 2026-11-18); gates: DPA, full-stack restore drill, off-host copy, Resend email.
+- Not built yet: studio/meta units (on demand), egress door, upstream-diff.sh, image digests
   in `upstream.lock` (pulled digests are in `install.sh pull` output), SMTP.
 
 ## Next actions

@@ -40,6 +40,12 @@
 #                            for the yearly post-bokslut run, a short one for
 #                            nightly runs, or unset and rely on bucket default
 #                            retention. COMPLIANCE retention cannot be shortened.
+#   BACKUP_LOCAL_DIR         optional, instead of the BACKUP_S3_* and AWS_* variables:
+#                            write the set to <dir>/<prefix>/<name>/ on a local or
+#                            mounted filesystem (no aws needed). An off-host copy of
+#                            that directory is then the operator's job.
+#   BACKUP_DB_CONFIG_DIR     optional: the db-config volume already mounted at this
+#                            path (Podman Quadlet); archived directly, no docker.
 #   BACKUP_WORKDIR           optional: scratch directory, default mktemp.
 #   BACKUP_LABEL             optional: name fragment, default "nightly".
 #   BACKUP_QUIESCE_CMD       optional: a command run BEFORE the dump and
@@ -64,10 +70,12 @@ set -euo pipefail
 umask 077
 
 : "${BACKUP_DATABASE_URL:?BACKUP_DATABASE_URL is required}"
-: "${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT is required}"
-: "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET is required}"
-: "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}"
-: "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}"
+if [ -z "${BACKUP_LOCAL_DIR:-}" ]; then
+  : "${BACKUP_S3_ENDPOINT:?BACKUP_S3_ENDPOINT is required (or set BACKUP_LOCAL_DIR)}"
+  : "${BACKUP_S3_BUCKET:?BACKUP_S3_BUCKET is required}"
+  : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}"
+  : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}"
+fi
 
 # The hooks are a pair. A quiesce command without its resume command would
 # leave the operator's app stopped after every run (and a resume command
@@ -94,7 +102,8 @@ fi
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 NAME="${LABEL}-${STAMP}"
 
-for bin in pg_dump psql tar gzip aws; do
+TOOLS="pg_dump psql tar gzip"; [ -n "${BACKUP_LOCAL_DIR:-}" ] || TOOLS="$TOOLS aws"
+for bin in $TOOLS; do
   command -v "$bin" >/dev/null 2>&1 || { echo "backup: missing required tool: $bin" >&2; exit 2; }
 done
 if command -v sha256sum >/dev/null 2>&1; then SHA="sha256sum"; else SHA="shasum -a 256"; fi
@@ -112,13 +121,20 @@ cleanup() {
   if [ "$QUIESCE_ATTEMPTED" = 1 ] && [ -n "${BACKUP_RESUME_CMD:-}" ]; then
     bash -c "$BACKUP_RESUME_CMD" || echo "backup: BACKUP_RESUME_CMD failed; check that the app is running" >&2
   fi
-  [ -z "${BACKUP_WORKDIR:-}" ] && rm -rf "$WORK"
+  # an if, not "[ ] &&": under set -e a trap ending on a false test turns a clean run into exit 1
+  if [ -z "${BACKUP_WORKDIR:-}" ]; then rm -rf "$WORK"; fi
 }
 trap cleanup EXIT
 
 upload() {
   # upload <local-file> <key>
   local file="$1" key="$2"
+  if [ -n "${BACKUP_LOCAL_DIR:-}" ]; then
+    mkdir -p "${BACKUP_LOCAL_DIR}/$(dirname "$key")"
+    cp "$file" "${BACKUP_LOCAL_DIR}/${key}"
+    echo "backup: wrote ${BACKUP_LOCAL_DIR}/${key}"
+    return
+  fi
   local args=(s3api put-object --endpoint-url "$BACKUP_S3_ENDPOINT" --bucket "$BACKUP_S3_BUCKET" --key "$key" --body "$file")
   if [ -n "${BACKUP_OBJECT_LOCK_DAYS:-}" ]; then
     local until
@@ -178,7 +194,12 @@ fi
 #    recommended: without it Vault-encrypted columns in the dump are
 #    unreadable after a restore.
 DBCONFIG_FILE=""
-if [ -n "${BACKUP_DB_CONFIG_VOLUME:-}" ]; then
+if [ -n "${BACKUP_DB_CONFIG_DIR:-}" ]; then
+  [ -d "$BACKUP_DB_CONFIG_DIR" ] || { echo "backup: BACKUP_DB_CONFIG_DIR does not exist: $BACKUP_DB_CONFIG_DIR" >&2; exit 2; }
+  DBCONFIG_FILE="${WORK}/${NAME}.db-config.tar.gz"
+  tar -C "$BACKUP_DB_CONFIG_DIR" -czf "$DBCONFIG_FILE" .
+  echo "backup: db-config archive $(du -h "$DBCONFIG_FILE" | cut -f1)"
+elif [ -n "${BACKUP_DB_CONFIG_VOLUME:-}" ]; then
   command -v docker >/dev/null 2>&1 || { echo "backup: BACKUP_DB_CONFIG_VOLUME set but docker not found" >&2; exit 2; }
   DBCONFIG_FILE="${WORK}/${NAME}.db-config.tar.gz"
   docker run --rm -v "${BACKUP_DB_CONFIG_VOLUME}:/src:ro" -v "${WORK}:/out" alpine:3 \
