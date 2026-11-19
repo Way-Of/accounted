@@ -23,9 +23,9 @@
 	handle {
 		reverse_proxy 127.0.0.1:{$ACCOUNTED_INTERNAL_APP_PORT} {
 			# Next builds request.url from its bind address (HOSTNAME=0.0.0.0, internal port), so
-			# absolute redirects such as /auth/callback -> /reset-password name 0.0.0.0. Map them
-			# back to the origin the browser used.
-			header_down Location "^https?://(0\.0\.0\.0|127\.0\.0\.1|localhost):{$ACCOUNTED_INTERNAL_APP_PORT}(.*)$" "{http.request.scheme}://{http.request.hostport}$2"
+			# absolute redirects such as /auth/callback -> /reset-password name 0.0.0.0. Make them
+			# relative, so they hold for the loopback door and for a hostname behind TLS alike.
+			header_down Location "^https?://(0\.0\.0\.0|127\.0\.0\.1|localhost):{$ACCOUNTED_INTERNAL_APP_PORT}(/.*)$" "$2"
 		}
 	}
 }
