@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type SupabaseClientOptions } from '@supabase/supabase-js'
+import { supabaseServerFetch } from './internal-gateway'
 
 /**
  * Auth options every server-side Supabase client MUST use.
@@ -58,6 +59,8 @@ export function createServiceRoleClient(
 ): SupabaseClient {
   return createClient(url, key, {
     ...options,
+    // the gateway inside the box when SUPABASE_INTERNAL_URL is set (internal-gateway.ts)
+    global: { fetch: supabaseServerFetch, ...options?.global },
     auth: { ...options?.auth, ...SERVER_AUTH_OPTIONS },
   })
 }

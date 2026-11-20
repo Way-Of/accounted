@@ -122,6 +122,22 @@ describe('requireAuth', () => {
     expect(getUser).toHaveBeenCalledTimes(1)
   })
 
+  it('answers 503, not 401, when the auth server could not be reached', async () => {
+    // A 401 here is read by the session controller as an ended session; a network blip is not one.
+    const getClaims = vi.fn().mockResolvedValue({ data: null, error: null })
+    const getUser = vi.fn().mockResolvedValue({
+      data: { user: null },
+      error: { __isAuthError: true, name: 'AuthRetryableFetchError', status: 0, message: 'fetch failed' },
+    })
+    useSupabase({ getClaims, getUser, mfa: noFactors() })
+
+    const result = await requireAuth()
+
+    expect(result.user).toBeNull()
+    expect(result.error?.status).toBe(503)
+    expect(await result.error?.json()).toEqual({ error: 'Auth unavailable', code: 'AUTH_UNAVAILABLE' })
+  })
+
   it('falls back to getUser when getClaims throws (JWKS outage)', async () => {
     const getClaims = vi.fn().mockRejectedValue(new Error('jwks fetch failed'))
     const getUser = vi.fn().mockResolvedValue({ data: { user: MOCK_USER }, error: null })
