@@ -1149,11 +1149,16 @@ const MCP_DOCUMENT_MIME_TYPES = [
   'image/png',
   'image/heic',
   'image/webp',
+  // A received e-invoice (Peppol BIS Billing 3 / UBL, or CII) IS the verifikation and must be kept in the
+  // form it arrived (BFL 7 kap, ML 17 kap): an agent hands it in as XML, not as a picture of it. The
+  // document service shape-checks XML (looksLikeXml) and AI extraction skips it as unsupported media.
+  'application/xml',
+  'text/xml',
 ] as const
 
 const MCP_DOCUMENT_MIME_TYPE_SET = new Set<string>(MCP_DOCUMENT_MIME_TYPES)
 
-function resolveMcpDocumentMimeType(fileName: string, requestedMimeType: unknown): string {
+export function resolveMcpDocumentMimeType(fileName: string, requestedMimeType: unknown): string {
   let mimeType = typeof requestedMimeType === 'string' ? requestedMimeType : undefined
   if (!mimeType) {
     const extension = fileName.split('.').pop()?.toLowerCase()
@@ -1164,12 +1169,13 @@ function resolveMcpDocumentMimeType(fileName: string, requestedMimeType: unknown
       png: 'image/png',
       heic: 'image/heic',
       webp: 'image/webp',
+      xml: 'application/xml',
     }
     mimeType = extension ? mimeMap[extension] : undefined
     if (!mimeType) throw new Error(`Cannot infer MIME type from extension: .${extension}`)
   }
   if (!MCP_DOCUMENT_MIME_TYPE_SET.has(mimeType)) {
-    throw new Error(`Unsupported file type: ${mimeType}. Allowed: PDF, JPEG, PNG, HEIC, WebP`)
+    throw new Error(`Unsupported file type: ${mimeType}. Allowed: PDF, JPEG, PNG, HEIC, WebP, XML (e-invoice)`)
   }
   return mimeType
 }
