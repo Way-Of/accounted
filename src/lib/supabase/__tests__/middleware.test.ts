@@ -569,6 +569,30 @@ describe('updateSession redirect destinations', () => {
       expect(response.cookies.get(SESSION_TIMEOUT_COOKIE)?.value).toBe('')
     })
 
+    it('keeps the session cookies when the auth server could not be reached', async () => {
+      // A network blip between the app and its gateway (fetch failed, a 502 from a CDN) is an
+      // AuthRetryableFetchError: it says nothing about the session. Signing out on it ended sessions
+      // minutes after sign-in on a self-hosted box (2026-11-20).
+      state.authError = {
+        __isAuthError: true,
+        name: 'AuthRetryableFetchError',
+        status: 0,
+        message: 'fetch failed',
+      }
+
+      await run('/settings/tax', { headers: { cookie: 'sb-test-auth-token=live' } })
+
+      expect(state.signOut).not.toHaveBeenCalled()
+    })
+
+    it('still clears a session the auth server refused', async () => {
+      state.authError = { __isAuthError: true, name: 'AuthApiError', status: 400, code: 'refresh_token_not_found' }
+
+      await run('/settings/tax', { headers: { cookie: 'sb-test-auth-token=dead' } })
+
+      expect(state.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    })
+
     it('drops a request path that normalises to a protocol-relative URL', async () => {
       // /..//evil.com normalises to the pathname //evil.com. Reflecting that
       // back as ?next= would hand the login page an off-origin destination.

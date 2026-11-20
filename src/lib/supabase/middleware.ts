@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
-import type { User } from '@supabase/supabase-js'
+import { isAuthRetryableFetchError, type User } from '@supabase/supabase-js'
+import { supabaseServerFetch } from '@/lib/supabase/internal-gateway'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createLogger } from '@/lib/logger'
 import { shouldExposeTimingHeaders } from '@/lib/observability/timing-headers'
@@ -117,6 +118,7 @@ async function updateSessionInner(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: supabaseServerFetch },
       cookies: {
         getAll() {
           return request.cookies.getAll()
@@ -155,7 +157,11 @@ async function updateSessionInner(
   // intact. scope: 'local' only clears cookies: the refresh token is already
   // dead server-side, and the default global-revoke round-trip re-triggers
   // the failed refresh, the exact AuthApiError this cleans up after.
-  if (authError && !user && !pathname.startsWith('/auth')) {
+  //
+  // A request that never reached the auth server (network down, gateway 5xx: AuthRetryableFetchError)
+  // proves nothing about the session: clearing the cookies then signed a person out because of a network
+  // blip (measured 2026-11-20: "Sessionen har upphört av säkerhetsskäl" minutes after sign-in).
+  if (authError && !user && !pathname.startsWith('/auth') && !isAuthRetryableFetchError(authError)) {
     try {
       await supabase.auth.signOut({ scope: 'local' })
     } catch (signOutError) {

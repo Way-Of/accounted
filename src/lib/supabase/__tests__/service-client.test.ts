@@ -53,7 +53,9 @@ describe('createServiceRoleClient', () => {
       { db?: unknown; global?: unknown },
     ]
     expect(options.db).toEqual({ schema: 'public' })
-    expect(options.global).toEqual({ headers: { 'x-test': '1' } })
+    // the caller's headers are kept; the fetch is the one that reaches the gateway inside the box
+    expect(options.global).toMatchObject({ headers: { 'x-test': '1' } })
+    expect(typeof (options.global as { fetch?: unknown }).fetch).toBe('function')
   })
 
   it('refuses to let a caller re-enable the ticker', () => {

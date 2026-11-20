@@ -5,8 +5,12 @@ import type { Instrumentation } from 'next'
 import { isClientDisconnectError } from '@/lib/observability/is-client-disconnect'
 
 export async function register() {
-  // Instrumentation hook: currently a no-op.
-  // Add runtime-specific setup here if needed.
+  // Self-hosted: the server reaches its own Supabase gateway inside the box (SUPABASE_INTERNAL_URL),
+  // never through the public name and the CDN. A no-op when it is not set. Node.js runtime only.
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { installInternalGatewayFetch } = await import('@/lib/supabase/internal-gateway')
+    installInternalGatewayFetch()
+  }
 }
 
 /**

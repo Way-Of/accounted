@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { supabaseServerFetch } from './internal-gateway'
 
 // During Docker builds, NEXT_PUBLIC_* vars are placeholder sentinels
 // replaced at runtime by docker-entrypoint.sh.
@@ -35,6 +36,7 @@ export async function createClient() {
     safeUrl,
     safeKey,
     {
+      global: { fetch: supabaseServerFetch },
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -65,6 +67,6 @@ export function createServiceClient() {
   return createServerClient(
     safeUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { cookies: { getAll: () => [], setAll: () => {} } }
+    { global: { fetch: supabaseServerFetch }, cookies: { getAll: () => [], setAll: () => {} } }
   )
 }

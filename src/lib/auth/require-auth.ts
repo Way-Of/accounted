@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { mfaStepUpApplies } from './mfa'
-import type { JwtPayload, User, SupabaseClient } from '@supabase/supabase-js'
+import { isAuthRetryableFetchError, type JwtPayload, type User, type SupabaseClient } from '@supabase/supabase-js'
 import { claimsPinned, userFromClaims } from './claims'
 
 type AuthResult =
@@ -61,8 +61,20 @@ export async function requireAuth(): Promise<AuthResult> {
     console.error('requireAuth: getClaims failed; falling back to getUser', err)
   }
   if (!user) {
-    const { data } = await supabase.auth.getUser()
+    const { data, error } = await supabase.auth.getUser()
     user = data?.user ?? null
+    if (!user && isAuthRetryableFetchError(error)) {
+      // The auth server was not reached: that is not a signed-out person. A 401 here made the session
+      // controller sign the person out on a network blip (2026-11-20); a 503 is retried instead.
+      return {
+        user: null,
+        supabase,
+        error: NextResponse.json(
+          { error: 'Auth unavailable', code: 'AUTH_UNAVAILABLE' },
+          { status: 503, headers: { 'Retry-After': '5', 'Cache-Control': 'no-store' } },
+        ),
+      }
+    }
   }
 
   if (!user) {
